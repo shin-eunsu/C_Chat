@@ -23,6 +23,7 @@ char* clnt_names[MAX_CLNT];
 char userID[NAME_SIZE];
 char targetID[NAME_SIZE];
 char recv_msg[BUF_SIZE];
+char buf[BUF_SIZE];
 
 void whisp_msg();
 
@@ -63,7 +64,7 @@ int main(int argc, char* argv[])
 				&clnt_addr_size);
 		
 		pthread_mutex_lock(&mutx);
-
+		printf("\n\n** start while **\n\n");
 		strcpy(ID_check, "NG");
 		memset(clnt_name, 0, NAME_SIZE);
 		memset(clnt_port_tmp, 0, sizeof(clnt_port_tmp));
@@ -71,16 +72,15 @@ int main(int argc, char* argv[])
 		while(!strcmp(ID_check, "NG"))
 		{
 			read(clnt_sock, clnt_name, NAME_SIZE); //ID recv
-			
 			if(clnt_cnt == 0)
 			{
 				strcpy(ID_check, "OK");
-				write(clnt_sock, ID_check, strlen(ID_check));
 			}
 			else
 			{
 				for(int i = 0; i < clnt_cnt; i++) //ID check
 				{
+				printf("names[%d]:%s, name:%s\n", i, clnt_names[i], clnt_name);
 					if(strcmp(clnt_names[i], clnt_name) != 0 )
 					{
 						strcpy(ID_check, "OK");
@@ -88,20 +88,21 @@ int main(int argc, char* argv[])
 					else
 					{
 						strcpy(ID_check, "NG");
+						sprintf(clnt_port_tmp, "%d", clnt_addr.sin_port);		
+						sprintf(recv_msg, "%s %s", ID_check, clnt_port_tmp);
+						write(clnt_sock, recv_msg, strlen(recv_msg));
 						break;
 					}
 				}
-				write(clnt_sock, ID_check, strlen(ID_check));
 			}
 		}
-
-		sprintf(clnt_port_tmp, "%d", clnt_addr.sin_port);
-		printf("port d: %d\n", clnt_addr.sin_port);
-		printf("port c: ");
-		fputs(clnt_port_tmp, stdout);
+		sprintf(clnt_port_tmp, "%d", clnt_addr.sin_port);		
+		//snd ID_check & port
+		sprintf(recv_msg, "%s %s", ID_check, clnt_port_tmp);
+		write(clnt_sock, recv_msg, strlen(recv_msg));
+		printf("recv_msg:");
+		fputs(recv_msg, stdout);
 		puts("");
-		//clnt_port snd
-		write(clnt_sock, clnt_port_tmp, strlen(clnt_port_tmp));
 
 		clnt_names[clnt_cnt] = (char*)malloc(sizeof(char) * NAME_SIZE);
 		clnt_addrs[clnt_cnt] = (char*)malloc(sizeof(clnt_addr.sin_addr));
@@ -112,15 +113,27 @@ int main(int argc, char* argv[])
 		strcpy(clnt_addrs[clnt_cnt++], inet_ntoa(clnt_addr.sin_addr));
 		
 		pthread_mutex_unlock(&mutx);
-
+		
+		//user List
+		printf(" - User List - \n");
 		for(int i = 0; i < clnt_cnt; i++)
 		{
-//			printf("(%d)name: %s, port: %d\n", i, clnt_names[i], clnt_ports[i]);
+			printf("(%d)name: %s, port: %d\n", i, clnt_names[i], clnt_ports[i]);
 		}
-		
+		memset(&buf, 0, BUF_SIZE);
+		strcpy(buf, "Login: ");
+		strcpy(buf, clnt_name);
+		//Login message
+		for(int i = 0; i < clnt_cnt; i++)
+		{
+//			write(clnt_socks[i], buf, BUF_SIZE);
+		}
+
 		pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
 		pthread_detach(t_id);
 		printf("[%s] Login\n", clnt_name);
+		
+	
 		printf("connect:[%s] %s(%d) (%d users)\n", clnt_name,
 				inet_ntoa(clnt_addr.sin_addr), clnt_addr.sin_port, clnt_cnt);
 	}

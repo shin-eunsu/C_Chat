@@ -12,20 +12,20 @@
 void* send_msg(void* arg);
 void* recv_msg(void* arg);
 void err_msg(char* msg);
-char port_num[10];
+void ID_port_recv_check();
 
 char name[NAME_SIZE] = "[DEFAULT]";
 char msg[BUF_SIZE];
 
 char ID_check[3];
-int read_check;
+char port_num[10];
+int serv_sock;
 
 pthread_mutex_t mutx;
 
 int main(int argc, char* argv[])
 {
 	int menu_num;
-	int serv_sock;
 	struct sockaddr_in serv_addr;
 	pthread_t snd_thread, rcv_thread;
 	void* thread_return;
@@ -44,36 +44,16 @@ int main(int argc, char* argv[])
 	
 	pthread_mutex_lock(&mutx);
 	strcpy(ID_check, "NG");
-	printf("Enter ID: ");
-	fgets(name, NAME_SIZE, stdin);
-	name[strlen(name) - 1] = 0;
 
-	
-	write(serv_sock, name, strlen(name)); //ID send
-	read(serv_sock, ID_check, sizeof(ID_check)); //ID check
-	
-	while(strcmp(ID_check, "NG") == 0 )
+	printf("Enter ID: ");
+	ID_port_recv_check();
+
+	while(strcmp(ID_check, "NG") == 0)
 	{
 		printf("[%s] in use, Enter New ID: ", name);
-		fgets(name, NAME_SIZE, stdin);
-		name[strlen(name) - 1] = 0;
-
-		write(serv_sock, name, strlen(name)); //ID send
-		read(serv_sock, ID_check, 3); //ID check
+		ID_port_recv_check();
 	}
-
-	fputs(ID_check, stdout);
-	puts("");
-	//clnt_port recv
-	memset(&port_num, 0, sizeof(port_num));
-	read(serv_sock, port_num, 10);
-	for(int i = 0; i < 10; i++)
-	{
-		printf("[%c]", port_num[i]);
-	}
-	printf("port num: ");
-	fputs(port_num, stdout);
-	puts("");
+	
 	pthread_mutex_unlock(&mutx);
 
 	pthread_create(&snd_thread, NULL, send_msg, (void*)&serv_sock);
@@ -84,12 +64,24 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
+void ID_port_recv_check()
+{	
+	memset(&msg, 0, BUF_SIZE);
+	fgets(name, NAME_SIZE, stdin);
+	name[strlen(name) - 1] = 0;
+	write(serv_sock, name, strlen(name)); //ID send
+	read(serv_sock, msg, BUF_SIZE); //ID & port recv
+	strcpy(ID_check, strtok(msg, " ")); //ID
+	strcpy(port_num, strtok(NULL, " ")); //port
+}
+
 void* send_msg(void* arg)
 {
 	int sock = *((int*)arg);
 	char name_msg[NAME_SIZE + BUF_SIZE];
 	while(1)
 	{
+		memset(&msg, 0 , BUF_SIZE);
 		memset(&name_msg, 0, sizeof(name_msg));
 		fgets(msg, BUF_SIZE, stdin);
 		if(!strcmp(msg, "q\n") || !strcmp(msg, "Q\n"))
