@@ -66,12 +66,13 @@ int main(int argc, char* argv[])
 
 void ID_port_recv_check()
 {	
-	memset(&msg, 0, BUF_SIZE);
+	char buf[BUFSIZ];
+	memset(&buf, 0, BUF_SIZE);
 	fgets(name, NAME_SIZE, stdin);
 	name[strlen(name) - 1] = 0;
 	write(serv_sock, name, strlen(name)); //ID send
-	read(serv_sock, msg, BUF_SIZE); //ID & port recv
-	strcpy(ID_check, strtok(msg, " ")); //ID
+	read(serv_sock, buf, BUF_SIZE); //ID & port recv
+	strcpy(ID_check, strtok(buf, " ")); //ID
 	strcpy(port_num, strtok(NULL, " ")); //port
 }
 
@@ -91,6 +92,10 @@ void* send_msg(void* arg)
 		}
 		sprintf(name_msg, "%s: %s", name, msg);
 		write(sock, name_msg, strlen(name_msg));
+
+		printf("send_msg:");
+		fputs(name_msg, stdout);
+		puts("");
 	}
 	return NULL;
 }

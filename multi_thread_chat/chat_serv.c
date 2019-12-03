@@ -24,6 +24,8 @@ char userID[NAME_SIZE];
 char targetID[NAME_SIZE];
 char recv_msg[BUF_SIZE];
 char buf[BUF_SIZE];
+struct sockaddr_in serv_addr, clnt_addr;
+int clnt_addr_size;
 
 void whisp_msg();
 
@@ -35,8 +37,6 @@ int main(int argc, char* argv[])
 	char clnt_name[NAME_SIZE];
 	char clnt_port_tmp[10];
 	char ID_check[3];
-	struct sockaddr_in serv_addr, clnt_addr;
-	int clnt_addr_size;
 	pthread_t t_id;
 
 	char tmp[10];
@@ -64,7 +64,6 @@ int main(int argc, char* argv[])
 				&clnt_addr_size);
 		
 		pthread_mutex_lock(&mutx);
-		printf("\n\n** start while **\n\n");
 		strcpy(ID_check, "NG");
 		memset(clnt_name, 0, NAME_SIZE);
 		memset(clnt_port_tmp, 0, sizeof(clnt_port_tmp));
@@ -80,7 +79,7 @@ int main(int argc, char* argv[])
 			{
 				for(int i = 0; i < clnt_cnt; i++) //ID check
 				{
-				printf("names[%d]:%s, name:%s\n", i, clnt_names[i], clnt_name);
+					//printf("names[%d]:%s, name:%s\n", i, clnt_names[i], clnt_name);
 					if(strcmp(clnt_names[i], clnt_name) != 0 )
 					{
 						strcpy(ID_check, "OK");
@@ -118,11 +117,13 @@ int main(int argc, char* argv[])
 		printf(" - User List - \n");
 		for(int i = 0; i < clnt_cnt; i++)
 		{
-			printf("(%d)name: %s, port: %d\n", i, clnt_names[i], clnt_ports[i]);
+			printf("(%d)name: %s, port: %d, IP: %s\n",
+					i, clnt_names[i], clnt_ports[i], inet_ntoa(clnt_addr.sin_addr));
 		}
 		memset(&buf, 0, BUF_SIZE);
 		strcpy(buf, "Login: ");
 		strcpy(buf, clnt_name);
+
 		//Login message
 		for(int i = 0; i < clnt_cnt; i++)
 		{
@@ -132,10 +133,9 @@ int main(int argc, char* argv[])
 		pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
 		pthread_detach(t_id);
 		printf("[%s] Login\n", clnt_name);
-		
 	
-		printf("connect:[%s] %s(%d) (%d users)\n", clnt_name,
-				inet_ntoa(clnt_addr.sin_addr), clnt_addr.sin_port, clnt_cnt);
+//		printf("connect:[%s] %s(%d) (%d users)\n", clnt_name,
+//				inet_ntoa(clnt_addr.sin_addr), clnt_addr.sin_port, clnt_cnt);
 	}
 	close(serv_sock);
 	return 0;
@@ -146,10 +146,13 @@ void* handle_clnt(void* arg)
 	int clnt_sock = *((int*)arg);
 	int str_len = 0, i;
 	char msg[BUF_SIZE];
-
+	
+	memset(&msg, 0, BUF_SIZE);
 	while((str_len = read(clnt_sock, msg, sizeof(msg))) != 0)
 		send_msg(msg, str_len);
-	
+	printf("handle_clnt/msg:");
+	fputs(msg, stdout);
+	puts("");
 	pthread_mutex_lock(&mutx);
 
 	for(i = 0; i < clnt_cnt; i++)
@@ -159,8 +162,6 @@ void* handle_clnt(void* arg)
 			if(str_len == 0)
 			{
 				printf("[%s] Logout.\n", clnt_names[i]);
-//				printf("disconnect:(%d) [%s] %s(%d) (%d users)\n", i, 
-//					clnt_names[i], clnt_addrs[i], clnt_ports[i], clnt_cnt - 1);
 			}
 			while(i < clnt_cnt - 1)
 			{
@@ -189,6 +190,8 @@ void send_msg(char* msg, int len)
 {
 	int i, j, name_cnt;
 	char buf[BUF_SIZE];
+	char userList[BUF_SIZE];
+	char snd_msg[BUFSIZ];
 
 	pthread_mutex_lock(&mutx);
 	
@@ -197,16 +200,38 @@ void send_msg(char* msg, int len)
 	strncpy(userID, buf, strlen(buf) - 1);// ID: -> ID
 	strncpy(recv_msg, msg + strlen(buf) + 1, BUF_SIZE); //recv message(remove id)
 
+	printf("snd_msg/clnt_all:");
+	fputs(msg, stdout);
+	puts("");
 	if(!strncmp(recv_msg, "/w", 2))
 	{
-		whisp_msg();	
+		whisp_msg();
+	}
+	else if(!strncmp(recv_msg, "/list", 5))
+	{		
+		strcpy(msg, " - User List - \n");
+		for(int i = 0; i < clnt_cnt; i++)
+		{
+			sprintf(userList, "(%d)name: %s, port: %d, IP: %s\n",
+					i, clnt_names[i], clnt_ports[i], inet_ntoa(clnt_addr.sin_addr));
+			strcat(snd_msg, userList);
+		}	
+		for(int i = 0; i < clnt_cnt; i++)
+		{
+//			if(clnt_names[i] == userID)
+				write(clnt_socks[i], snd_msg, BUF_SIZE);
+		}
 	}
 	else
 	{
 		//send client all
 		for(i = 0; i < clnt_cnt; i++)
 		{
-			write(clnt_socks[i], msg, BUF_SIZE);
+//			if(clnt_names[i] != userID)
+				write(clnt_socks[i], msg, BUF_SIZE);
+				printf("snd_msg/clnt_all:");
+				fputs(msg, stdout);
+				puts("");
 		}
 	}
 	pthread_mutex_unlock(&mutx);
